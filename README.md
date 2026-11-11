@@ -35,6 +35,6 @@ Add a migration under `supabase/migrations/`, try it with `npx supabase db reset
 the types, then push it to the hosted project:
 
 ```sh
-npx supabase gen types typescript --local > src/lib/database.types.ts
+npm run db:types
 npx supabase db push --remote
 ```

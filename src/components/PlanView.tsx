@@ -1,10 +1,13 @@
-import { SLOTS, type PlanEntry, type Recipe, type Slot } from '../lib/api'
+import { useState } from 'react'
+import { SLOTS, type Collection, type PlanEntry, type Recipe, type Slot } from '../lib/api'
 import { toISODate, weekDays } from '../lib/dates'
+import { RecipePicker } from './RecipePicker'
 
 type Props = {
   weekStart: Date
   entries: PlanEntry[]
   recipes: Recipe[]
+  collections: Collection[]
   onAdd: (date: string, slot: Slot, recipe: Recipe) => void
   onServings: (entry: PlanEntry, servings: number) => void
   onRemove: (entry: PlanEntry) => void
@@ -16,7 +19,16 @@ const DAY_FORMAT = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
 })
 
-export function PlanView({ weekStart, entries, recipes, onAdd, onServings, onRemove }: Props) {
+export function PlanView({
+  weekStart,
+  entries,
+  recipes,
+  collections,
+  onAdd,
+  onServings,
+  onRemove,
+}: Props) {
+  const [adding, setAdding] = useState<{ date: string; slot: Slot; label: string } | null>(null)
   const recipesById = new Map(recipes.map((recipe) => [recipe.id, recipe]))
   const today = toISODate(new Date())
 
@@ -68,27 +80,33 @@ export function PlanView({ weekStart, entries, recipes, onAdd, onServings, onRem
                       </button>
                     </div>
                   ))}
-                <select
+                <button
+                  type="button"
                   className="add-meal"
                   aria-label={`Add ${slot} on ${DAY_FORMAT.format(day)}`}
-                  value=""
-                  onChange={(event) => {
-                    const recipe = recipesById.get(event.target.value)
-                    if (recipe) onAdd(date, slot, recipe)
-                  }}
+                  onClick={() =>
+                    setAdding({ date, slot, label: `${slot}, ${DAY_FORMAT.format(day)}` })
+                  }
                 >
-                  <option value="">+ Add</option>
-                  {recipes.map((recipe) => (
-                    <option key={recipe.id} value={recipe.id}>
-                      {recipe.title}
-                    </option>
-                  ))}
-                </select>
+                  + Add
+                </button>
               </div>
             ))}
           </section>
         )
       })}
+      {adding && (
+        <RecipePicker
+          title={adding.label}
+          recipes={recipes}
+          collections={collections}
+          onClose={() => setAdding(null)}
+          onPick={(recipe) => {
+            onAdd(adding.date, adding.slot, recipe)
+            setAdding(null)
+          }}
+        />
+      )}
     </div>
   )
 }

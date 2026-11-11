@@ -135,6 +135,7 @@ export function ProjectView({ project, onLeave }: Props) {
           weekStart={weekStart}
           entries={entries}
           recipes={recipes}
+          collections={collections}
           onAdd={(date, slot, recipe) =>
             change(() =>
               addEntry({
