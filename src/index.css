@@ -444,6 +444,10 @@ button.row-button {
   margin: 0;
 }
 
+.mains {
+  text-transform: capitalize;
+}
+
 .instructions {
   white-space: pre-line;
 }
@@ -476,6 +480,36 @@ input.invalid {
 .link-class.unsupported .badge {
   background: var(--border);
   color: var(--text);
+}
+
+/* A stacked fraction: numerator, bar, denominator. */
+.frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.15em;
+  font-size: 0.72em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.frac > span + span {
+  border-top: 1px solid currentColor;
+  padding: 0.05em 0.2em 0;
+}
+
+.frac > span:first-child {
+  padding: 0 0.2em 0.05em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .success {

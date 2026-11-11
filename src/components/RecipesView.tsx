@@ -8,8 +8,15 @@ import {
   type Recipe,
   type RecipeDraft,
 } from '../lib/api'
-import { formatIngredient, formatQuantity, parseIngredientLines } from '../lib/ingredients'
+import {
+  formatIngredient,
+  isMainIngredient,
+  parseIngredientLines,
+  shortName,
+} from '../lib/ingredients'
 import { classifyLink, extractUrl } from '../lib/links'
+import { IngredientLine, Quantity } from './Quantity'
+import { buildSchemaOrgRecipe, ingredientLinesOf, type SchemaOrgRecipe } from '../lib/schemaOrg'
 
 type Props = {
   projectId: string
@@ -36,6 +43,8 @@ type FormState = {
   sourceType: string
   ingredientText: string
   instructions: string
+  /** The schema.org document the recipe already has; the save builds on it. */
+  schemaOrg: SchemaOrgRecipe | null
 }
 
 function blankForm(collectionId: string): FormState {
@@ -51,6 +60,7 @@ function blankForm(collectionId: string): FormState {
     sourceType: 'manual',
     ingredientText: '',
     instructions: '',
+    schemaOrg: null,
   }
 }
 
@@ -68,8 +78,13 @@ function formFor(recipe: Recipe): FormState {
     totalMinutes: minutesText(recipe.total_minutes),
     sourceUrl: recipe.source_url ?? '',
     sourceType: recipe.source_type,
-    ingredientText: recipe.recipe_ingredients.map(formatIngredient).join('\n'),
+    // The stored document has each line as it was written ("1 ⅓ cups"), which the
+    // parsed columns cannot give back.
+    ingredientText: (
+      ingredientLinesOf(recipe.schema_org) ?? recipe.recipe_ingredients.map(formatIngredient)
+    ).join('\n'),
     instructions: recipe.instructions,
+    schemaOrg: recipe.schema_org as SchemaOrgRecipe,
   }
 }
 
@@ -85,22 +100,30 @@ function formForImport(imported: ImportedRecipe, collectionId: string): FormStat
     sourceType: 'web',
     ingredientText: imported.ingredients.join('\n'),
     instructions: imported.instructions,
+    schemaOrg: imported.schemaOrg,
   }
 }
 
 function draftFrom(form: FormState): RecipeDraft {
-  return {
-    id: form.id,
-    collectionId: form.collectionId,
+  const fields = {
     title: form.title,
     servings: Number(form.servings),
     instructions: form.instructions,
     sourceUrl: form.sourceUrl,
-    sourceType: form.sourceType,
     prepMinutes: minutesValue(form.prepMinutes),
     cookMinutes: minutesValue(form.cookMinutes),
     totalMinutes: minutesValue(form.totalMinutes),
+  }
+  return {
+    ...fields,
+    id: form.id,
+    collectionId: form.collectionId,
+    sourceType: form.sourceType,
     ingredients: parseIngredientLines(form.ingredientText),
+    schemaOrg: buildSchemaOrgRecipe(form.schemaOrg, {
+      ...fields,
+      ingredientLines: form.ingredientText.split('\n'),
+    }),
   }
 }
 
@@ -239,49 +262,85 @@ export function RecipesView({
       <ul className="plain stack">
         {shown.map((recipe) => (
           <li key={recipe.id} className="card">
-            <details className="recipe">
-              <summary>
-                <strong>{recipe.title}</strong>
-                <span className="muted">
-                  {[`makes ${recipe.servings}`, ...timings(recipe)].join(' · ')}
-                </span>
-              </summary>
-              <div className="recipe-body stack">
-                <ul>
-                  {recipe.recipe_ingredients.map((ingredient) => (
-                    <li key={ingredient.id}>{formatIngredient(ingredient)}</li>
-                  ))}
-                </ul>
-                {recipe.instructions && <p className="instructions">{recipe.instructions}</p>}
-                {recipe.source_url && (
-                  <p className="muted">
-                    From{' '}
-                    <a href={recipe.source_url} target="_blank" rel="noreferrer">
-                      {hostOf(recipe.source_url)}
-                    </a>
-                  </p>
-                )}
-                <div className="toolbar">
-                  <button type="button" onClick={() => setForm(formFor(recipe))}>Edit</button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (
-                        window.confirm(`Delete "${recipe.title}"? It also leaves the meal plan.`)
-                      ) {
-                        void onDelete(recipe)
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </details>
+            <RecipeCard
+              recipe={recipe}
+              onEdit={() => setForm(formFor(recipe))}
+              onDelete={() => void onDelete(recipe)}
+            />
           </li>
         ))}
       </ul>
     </div>
+  )
+}
+
+type CardProps = {
+  recipe: Recipe
+  onEdit: () => void
+  onDelete: () => void
+}
+
+/**
+ * One recipe in the list. A tap opens a short summary, the main ingredients
+ * on a line; "Full recipe" then shows every ingredient and the steps.
+ */
+function RecipeCard({ recipe, onEdit, onDelete }: CardProps) {
+  const [full, setFull] = useState(false)
+  const mains = recipe.recipe_ingredients.filter(isMainIngredient)
+  // A recipe of only seasonings still gets a summary: its first few ingredients.
+  const summary = (mains.length > 0 ? mains : recipe.recipe_ingredients.slice(0, 5)).map(
+    (ingredient) => shortName(ingredient.name),
+  )
+
+  return (
+    <details className="recipe">
+      <summary>
+        <strong>{recipe.title}</strong>
+        <span className="muted">
+          {[`makes ${recipe.servings}`, ...timings(recipe)].join(' · ')}
+        </span>
+      </summary>
+      <div className="recipe-body stack">
+        {full ? (
+          <>
+            <ul>
+              {recipe.recipe_ingredients.map((ingredient) => (
+                <li key={ingredient.id}>
+                  <IngredientLine ingredient={ingredient} />
+                </li>
+              ))}
+            </ul>
+            {recipe.instructions && <p className="instructions">{recipe.instructions}</p>}
+            {recipe.source_url && (
+              <p className="muted">
+                From{' '}
+                <a href={recipe.source_url} target="_blank" rel="noreferrer">
+                  {hostOf(recipe.source_url)}
+                </a>
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="mains">{summary.join(' · ')}</p>
+        )}
+        <div className="toolbar">
+          <button type="button" onClick={() => setFull(!full)}>
+            {full ? 'Main ingredients' : 'Full recipe'}
+          </button>
+          <button type="button" onClick={onEdit}>Edit</button>
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Delete "${recipe.title}"? It also leaves the meal plan.`)) {
+                onDelete()
+              }
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </details>
   )
 }
 
@@ -329,7 +388,9 @@ function ImportReview({ form, onSave, onEdit, onCancel }: ReviewProps) {
         <h4>{ingredients.length} ingredients</h4>
         <ul>
           {ingredients.map((ingredient, index) => (
-            <li key={index}>{formatIngredient(ingredient)}</li>
+            <li key={index}>
+              <IngredientLine ingredient={ingredient} />
+            </li>
           ))}
         </ul>
       </div>
@@ -551,7 +612,9 @@ function RecipeForm({ form, collections, onChange, onCancel, onSubmit }: FormPro
           <tbody>
             {ingredients.map((ingredient, index) => (
               <tr key={index}>
-                <td>{ingredient.quantity === null ? '—' : formatQuantity(ingredient.quantity)}</td>
+                <td>
+                  {ingredient.quantity === null ? '—' : <Quantity value={ingredient.quantity} />}
+                </td>
                 <td>{ingredient.unit ?? '—'}</td>
                 <td>{ingredient.name}</td>
               </tr>

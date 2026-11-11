@@ -165,14 +165,14 @@ isOneToOne: false
                   ]
                 },"recipes": {
                   Row: {
-                    "collection_id": string,"cook_minutes": number | null,"created_at": string,"created_by": string | null,"id": string,"instructions": string,"prep_minutes": number | null,"project_id": string,"servings": number,"source_type": string,"source_url": string | null,"title": string,"total_minutes": number | null,"updated_at": string
+                    "collection_id": string,"cook_minutes": number | null,"created_at": string,"created_by": string | null,"id": string,"instructions": string,"prep_minutes": number | null,"project_id": string,"schema_org": NonNullable<Json>,"servings": number,"source_type": string,"source_url": string | null,"title": string,"total_minutes": number | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "collection_id": string,"cook_minutes"?: number | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"instructions"?: string,"prep_minutes"?: number | null,"project_id": string,"servings"?: number,"source_type"?: string,"source_url"?: string | null,"title": string,"total_minutes"?: number | null,"updated_at"?: string
+                    "collection_id": string,"cook_minutes"?: number | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"instructions"?: string,"prep_minutes"?: number | null,"project_id": string,"schema_org": NonNullable<Json>,"servings"?: number,"source_type"?: string,"source_url"?: string | null,"title": string,"total_minutes"?: number | null,"updated_at"?: string
                   }
                   Update: {
-                    "collection_id"?: string,"cook_minutes"?: number | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"instructions"?: string,"prep_minutes"?: number | null,"project_id"?: string,"servings"?: number,"source_type"?: string,"source_url"?: string | null,"title"?: string,"total_minutes"?: number | null,"updated_at"?: string
+                    "collection_id"?: string,"cook_minutes"?: number | null,"created_at"?: string,"created_by"?: string | null,"id"?: string,"instructions"?: string,"prep_minutes"?: number | null,"project_id"?: string,"schema_org"?: NonNullable<Json>,"servings"?: number,"source_type"?: string,"source_url"?: string | null,"title"?: string,"total_minutes"?: number | null,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -227,7 +227,7 @@ isOneToOne: false
         isSetofReturn: false
       } },
 "save_recipe":
-{ Args: { "p_collection_id": string,"p_cook_minutes"?: number,"p_ingredients": Json,"p_instructions": string,"p_prep_minutes"?: number,"p_project_id": string,"p_recipe_id": string,"p_servings": number,"p_source_type": string,"p_source_url": string,"p_title": string,"p_total_minutes"?: number }; Returns: string
+{ Args: { "p_collection_id": string,"p_cook_minutes"?: number,"p_ingredients": Json,"p_instructions": string,"p_prep_minutes"?: number,"p_project_id": string,"p_recipe_id": string,"p_schema_org": Json,"p_servings": number,"p_source_type": string,"p_source_url": string,"p_title": string,"p_total_minutes"?: number }; Returns: string
                            }
           }
           Enums: {

@@ -1,5 +1,6 @@
-import type { Tables } from './database.types'
+import type { Json, Tables } from './database.types'
 import type { IngredientInput } from './ingredients'
+import type { SchemaOrgRecipe } from './schemaOrg'
 import { supabase } from './supabase'
 
 export type Project = Tables<'projects'>
@@ -87,6 +88,8 @@ export type RecipeDraft = {
   cookMinutes: number | null
   totalMinutes: number | null
   ingredients: IngredientInput[]
+  /** The recipe as a schema.org Recipe document: the form it is stored in. */
+  schemaOrg: SchemaOrgRecipe
 }
 
 export function saveRecipe(projectId: string, draft: RecipeDraft): Promise<string> {
@@ -102,6 +105,7 @@ export function saveRecipe(projectId: string, draft: RecipeDraft): Promise<strin
       p_source_type: draft.sourceType,
       p_source_url: draft.sourceUrl,
       p_ingredients: draft.ingredients,
+      p_schema_org: draft.schemaOrg as Json,
       p_prep_minutes: draft.prepMinutes ?? undefined,
       p_cook_minutes: draft.cookMinutes ?? undefined,
       p_total_minutes: draft.totalMinutes ?? undefined,
@@ -119,6 +123,8 @@ export type ImportedRecipe = {
   cookMinutes: number | null
   totalMinutes: number | null
   sourceUrl: string
+  /** The page's whole schema.org Recipe node. */
+  schemaOrg: SchemaOrgRecipe
 }
 
 /** An import that failed, with the function's HTTP status when it answered. */

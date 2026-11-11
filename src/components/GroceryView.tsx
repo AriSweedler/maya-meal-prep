@@ -3,6 +3,7 @@ import type { PlanEntry, Recipe } from '../lib/api'
 import { copyText } from '../lib/clipboard'
 import { buildGroceryList, type GroceryItem, type PlannedMeal } from '../lib/grocery'
 import { formatQuantity } from '../lib/ingredients'
+import { Quantity } from './Quantity'
 
 type Props = {
   /** Identifies this project and week, so ticks are remembered per list. */
@@ -77,7 +78,9 @@ export function GroceryView({ listKey, entries, recipes }: Props) {
                 checked={ticked.includes(item.key)}
                 onChange={() => toggle(item.key)}
               />
-              <span className="amount">{amount(item)}</span>
+              <span className="amount">
+                {item.quantity !== null && <Quantity value={item.quantity} />} {item.unit}
+              </span>
               <span>{item.name}</span>
               <span className="muted for">{item.recipes.join(', ')}</span>
             </label>

@@ -13,6 +13,8 @@ export type ImportedRecipe = {
   prepMinutes: number | null
   cookMinutes: number | null
   totalMinutes: number | null
+  /** The page's whole schema.org Recipe node, unchanged, for the app to store. */
+  schemaOrg: Record<string, unknown>
 }
 
 type Json = unknown
@@ -114,6 +116,7 @@ export function recipeFromJsonLd(document: Json): ImportedRecipe | null {
     prepMinutes: parseDurationMinutes(recipe.prepTime),
     cookMinutes: parseDurationMinutes(recipe.cookTime),
     totalMinutes: parseDurationMinutes(recipe.totalTime),
+    schemaOrg: recipe,
   }
 }
 

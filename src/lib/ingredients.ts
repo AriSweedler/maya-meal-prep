@@ -1,3 +1,5 @@
+import { getQuantityStyle, type QuantityStyle } from './preferences'
+
 export type IngredientInput = {
   name: string
   quantity: number | null
@@ -99,8 +101,46 @@ export function parseIngredientLines(text: string): IngredientInput[] {
     .filter((ingredient) => ingredient !== null)
 }
 
-export function formatQuantity(quantity: number): string {
-  return String(Math.round(quantity * 100) / 100)
+const MAX_DENOMINATOR = 100
+const FRACTION_TOLERANCE = 1e-4
+
+export type Fraction = { whole: number; numerator: number; denominator: number }
+
+/**
+ * A quantity as a whole number plus a fraction, using the smallest
+ * denominator up to 100 that matches it: 7/6 -> 1 and 1/6. The numerator is
+ * 0 for a whole number. Null when no such fraction matches.
+ */
+export function fractionParts(quantity: number): Fraction | null {
+  const whole = Math.floor(quantity + FRACTION_TOLERANCE)
+  const rest = quantity - whole
+  if (Math.abs(rest) < FRACTION_TOLERANCE) return { whole, numerator: 0, denominator: 1 }
+  for (let denominator = 2; denominator <= MAX_DENOMINATOR; denominator++) {
+    const numerator = Math.round(rest * denominator)
+    if (numerator > 0 && Math.abs(rest - numerator / denominator) < FRACTION_TOLERANCE) {
+      return { whole, numerator, denominator }
+    }
+  }
+  return null
+}
+
+/** The fraction as plain text, "1 1/6", for copying and editing. */
+export function toFraction(quantity: number): string | null {
+  const parts = fractionParts(quantity)
+  if (!parts) return null
+  if (parts.numerator === 0) return String(parts.whole)
+  const fraction = `${parts.numerator}/${parts.denominator}`
+  return parts.whole === 0 ? fraction : `${parts.whole} ${fraction}`
+}
+
+/** An amount for display: a fraction when one fits and the user has not chosen decimals. */
+export function formatQuantity(
+  quantity: number,
+  style: QuantityStyle = getQuantityStyle(),
+): string {
+  const decimal = String(Math.round(quantity * 100) / 100)
+  if (style === 'decimals') return decimal
+  return toFraction(quantity) ?? decimal
 }
 
 export function formatIngredient(ingredient: IngredientInput): string {
@@ -111,4 +151,42 @@ export function formatIngredient(ingredient: IngredientInput): string {
   ]
     .filter(Boolean)
     .join(' ')
+}
+
+const SMALL_UNITS = new Set(['tsp', 'pinch', 'dash', 'sprig', 'leaf'])
+
+// Seasonings and pantry staples: needed, but not what a recipe is "made of".
+const SEASONING_PATTERN = new RegExp(
+  '\\b(' +
+    [
+      'salt', '(black|white|ground|cracked|cayenne) pepper', 'peppercorns?', 'paprika', 'cumin', 'coriander', 'turmeric', 'cinnamon',
+      'nutmeg', 'cloves?', 'cardamom', 'allspice', 'oregano', 'thyme', 'rosemary', 'sage',
+      'bay lea(f|ves)', 'chil[ei] (powder|flakes)', 'red pepper flakes', 'cayenne',
+      'garlic powder', 'onion powder', 'curry powder', 'garam masala', 'za.?atar', 'sumac',
+      'seasoning', 'spice', 'vanilla', 'extract', 'baking (soda|powder)', 'cornstarch',
+      'oil', 'cooking spray', 'vinegar', 'water', 'ice',
+    ].join('|') +
+    ')\\b',
+  'i',
+)
+
+/**
+ * Whether an ingredient is one of the recipe's main ones, for a short
+ * summary: it has an amount, the amount is not spoon-sized, and it is not a
+ * seasoning or pantry staple. A heuristic; the full list is always available.
+ */
+export function isMainIngredient(ingredient: IngredientInput): boolean {
+  if (ingredient.quantity === null) return false
+  const unit = normalizeUnit(ingredient.unit)
+  if (unit !== null && SMALL_UNITS.has(unit)) return false
+  // A quarter cup or more counts; a spoonful or two does not.
+  if (unit === 'tbsp' && ingredient.quantity < 4) return false
+  // "pepper" alone is the seasoning; "bell pepper" is a vegetable.
+  if (/^(freshly ground )?pepper$/i.test(ingredient.name.trim())) return false
+  return !SEASONING_PATTERN.test(ingredient.name)
+}
+
+/** An ingredient's name without its preparation notes: "shallots, finely chopped (2 medium)" -> "shallots". */
+export function shortName(name: string): string {
+  return name.replace(/\([^)]*\)/g, '').split(',')[0].trim()
 }

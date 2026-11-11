@@ -70,6 +70,7 @@ describe('recipeFromJsonLd', () => {
       prepMinutes: 5,
       cookMinutes: 25,
       totalMinutes: 30,
+      schemaOrg: soup,
     })
   })
 

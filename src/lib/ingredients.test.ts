@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatIngredient,
+  formatQuantity,
+  toFraction,
+  isMainIngredient,
+  shortName,
   normalizeUnit,
   parseIngredientLine,
   parseIngredientLines,
@@ -93,9 +97,85 @@ describe('parseIngredientLine', () => {
 describe('formatIngredient', () => {
   it('round-trips through the parser', () => {
     const line = formatIngredient({ quantity: 1.5, unit: 'cup', name: 'flour' })
-    expect(line).toBe('1.5 cup flour')
+    expect(line).toBe('1 1/2 cup flour')
     expect(parseIngredientLine(line)).toEqual({
       quantity: 1.5, unit: 'cup', name: 'flour',
     })
+  })
+})
+
+describe('isMainIngredient', () => {
+  const main = (line: string) => isMainIngredient(parseIngredientLine(line)!)
+
+  it('keeps the ingredients a recipe is made of', () => {
+    for (const line of [
+      '1 ⅓ cups heavy cream',
+      '2 medium shallots, finely chopped',
+      '1 (28-ounce) can whole tomatoes',
+      '400 g chicken thighs',
+      '4 tablespoons unsalted butter',
+      '1 bell pepper',
+    ]) {
+      expect(main(line), line).toBe(true)
+    }
+  })
+
+  it('drops seasonings, spoonfuls, staples and anything without an amount', () => {
+    for (const line of [
+      'Salt',
+      '1 teaspoon ground cumin',
+      '2 tablespoons soy sauce',
+      '1/4 cup olive oil',
+      '1 cup water',
+      '2 bay leaves',
+      '1 teaspoon black pepper',
+      '2 pepper',
+      '1 pinch saffron',
+      'fresh parsley, to serve',
+    ]) {
+      expect(main(line), line).toBe(false)
+    }
+  })
+})
+
+describe('shortName', () => {
+  it('drops preparation notes and size notes', () => {
+    expect(shortName('medium shallots, finely chopped')).toBe('medium shallots')
+    expect(shortName('whole tomatoes (28-ounce)')).toBe('whole tomatoes')
+    expect(shortName('rice')).toBe('rice')
+  })
+})
+
+describe('toFraction', () => {
+  it.each([
+    [2, '2'],
+    [0.5, '1/2'],
+    [1.5, '1 1/2'],
+    [1 + 1 / 3, '1 1/3'],
+    [7 / 6, '1 1/6'],
+    [2 / 3, '2/3'],
+    [0.125, '1/8'],
+    [2.75, '2 3/4'],
+    [0.37, '37/100'],
+    [2.9999999, '3'],
+  ])('%d -> %s', (quantity, text) => {
+    expect(toFraction(quantity)).toBe(text)
+  })
+
+  it('is null when no denominator up to 100 fits', () => {
+    expect(toFraction(0.335)).toBeNull()
+    expect(toFraction(Math.PI)).toBeNull()
+  })
+})
+
+describe('formatQuantity', () => {
+  it('prefers fractions and falls back to two decimals', () => {
+    expect(formatQuantity(1.5)).toBe('1 1/2')
+    expect(formatQuantity(Math.PI)).toBe('3.14')
+  })
+
+  it('shows decimals when asked', () => {
+    expect(formatQuantity(1.5, 'decimals')).toBe('1.5')
+    expect(formatQuantity(1 + 1 / 3, 'decimals')).toBe('1.33')
   })
 })
