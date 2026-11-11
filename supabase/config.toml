@@ -449,3 +449,27 @@ verify_enabled = true
 
 [remotes.production.storage.vector]
 enabled = false
+
+# The staging project: a hosted database for development and for the app's debug mode.
+# Sign-up needs no email confirmation there, so test accounts are quick to make.
+[remotes.staging]
+project_id = "ramuowpzqwwplkufihii"
+
+[remotes.staging.auth]
+site_url = "https://meals.sweedler.com"
+additional_redirect_urls = ["http://localhost:5173"]
+
+[remotes.staging.auth.email]
+enable_confirmations = false
+max_frequency = "1m0s"
+otp_length = 8
+
+[remotes.staging.auth.sms]
+enable_confirmations = true
+
+[remotes.staging.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[remotes.staging.storage.vector]
+enabled = false

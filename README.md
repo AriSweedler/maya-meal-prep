@@ -18,6 +18,19 @@ plan. Live at https://meals.sweedler.com.
   it directly; row level security in `supabase/migrations/` limits every table to the project's
   members.
 
+## Staging and debug mode
+
+There are two hosted Supabase projects: the real one, and `maya-meal-prep-staging`, a copy of
+the schema with its own accounts and data that is safe to break. The "Debug mode" link at the
+bottom of the app switches that browser to staging, and the banner at the top switches back.
+Sign-up on staging needs no email confirmation.
+
+Push a migration to staging first, with its project ref from `supabase/config.toml`:
+
+```sh
+npx supabase db push --remote=<staging ref>
+```
+
 ## Run it locally
 
 Needs Node and Docker.

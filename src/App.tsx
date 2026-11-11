@@ -1,12 +1,24 @@
 import type { Session } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
 import { Auth } from './components/Auth'
+import { DebugBar } from './components/DebugBar'
 import { Projects } from './components/Projects'
 import { ProjectView } from './components/ProjectView'
 import type { Project } from './lib/api'
-import { isConfigured, supabase } from './lib/supabase'
+import { isConfigured, isDebugMode, supabase } from './lib/supabase'
 
 export default function App() {
+  // The banner goes above the app when debug mode is on; the switch sits below it when off.
+  return (
+    <>
+      {isDebugMode && <DebugBar />}
+      <Screen />
+      {!isDebugMode && <DebugBar />}
+    </>
+  )
+}
+
+function Screen() {
   const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [project, setProject] = useState<Project | null>(null)
 

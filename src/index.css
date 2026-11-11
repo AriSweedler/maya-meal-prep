@@ -166,6 +166,28 @@ button.row-button {
   margin-top: 0.75rem;
 }
 
+.debug-banner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  background: light-dark(#fde9c4, #4a3610);
+  color: light-dark(#4a3000, #fbe3b0);
+  font-size: 0.9rem;
+}
+
+.debug-footer {
+  text-align: center;
+  padding: 0 1rem 1.5rem;
+  font-size: 0.8rem;
+}
+
+.debug-footer .link {
+  color: var(--muted);
+}
+
 .account {
   display: flex;
   justify-content: flex-end;
