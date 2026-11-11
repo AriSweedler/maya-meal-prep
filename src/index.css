@@ -448,8 +448,13 @@ button.row-button {
   text-transform: capitalize;
 }
 
-.instructions {
-  white-space: pre-line;
+.steps {
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.steps li + li {
+  margin-top: 0.5rem;
 }
 
 .error {
@@ -518,7 +523,8 @@ input.invalid {
   font-weight: 600;
 }
 
-.review ul:not(.facts) {
+.review ul:not(.facts),
+.recipe-body ol {
   margin: 0;
   padding-left: 1.2rem;
 }

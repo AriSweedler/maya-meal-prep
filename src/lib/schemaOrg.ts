@@ -42,11 +42,10 @@ export function buildSchemaOrgRecipe(
   document.name = fields.title.trim()
   document.recipeYield = `${fields.servings} servings`
   document.recipeIngredient = fields.ingredientLines.map((line) => line.trim()).filter(Boolean)
-  document.recipeInstructions = fields.instructions
-    .split('\n')
-    .map((step) => step.replace(/^\s*\d+[.)]\s*/, '').trim())
-    .filter(Boolean)
-    .map((text) => ({ '@type': 'HowToStep', text }))
+  document.recipeInstructions = stepLines(fields.instructions).map((text) => ({
+    '@type': 'HowToStep',
+    text,
+  }))
   const duration = (minutes: number | null) =>
     minutes === null ? null : minutesToDuration(minutes)
   setOrRemove(document, 'prepTime', duration(fields.prepMinutes))
@@ -62,4 +61,27 @@ export function ingredientLinesOf(document: unknown): string[] | null {
   const lines = (document as SchemaOrgRecipe).recipeIngredient
   if (!Array.isArray(lines) || lines.length === 0) return null
   return lines.every((line) => typeof line === 'string') ? (lines as string[]) : null
+}
+
+/** Steps typed one per line, without any "1. " numbering. */
+export function stepLines(instructions: string): string[] {
+  return instructions
+    .split('\n')
+    .map((step) => step.replace(/^\s*\d+[.)]\s*/, '').trim())
+    .filter(Boolean)
+}
+
+/**
+ * The steps of a stored document. schema.org holds them as a list, of
+ * HowToStep objects or plain strings, so they are shown as a list too.
+ * Null when the document has none.
+ */
+export function stepsOf(document: unknown): string[] | null {
+  if (typeof document !== 'object' || document === null) return null
+  const list = (document as SchemaOrgRecipe).recipeInstructions
+  if (!Array.isArray(list)) return null
+  const steps = list
+    .map((step) => (typeof step === 'string' ? step : (step as { text?: unknown })?.text))
+    .filter((text): text is string => typeof text === 'string' && text.trim() !== '')
+  return steps.length > 0 ? steps : null
 }

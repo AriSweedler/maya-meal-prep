@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildSchemaOrgRecipe, ingredientLinesOf, minutesToDuration } from './schemaOrg'
+import {
+  buildSchemaOrgRecipe,
+  ingredientLinesOf,
+  minutesToDuration,
+  stepLines,
+  stepsOf,
+} from './schemaOrg'
 
 const fields = {
   title: ' Lentil Soup ',
@@ -77,5 +83,26 @@ describe('ingredientLinesOf', () => {
     expect(ingredientLinesOf(null)).toBeNull()
     expect(ingredientLinesOf({ recipeIngredient: [] })).toBeNull()
     expect(ingredientLinesOf({ recipeIngredient: [{ name: 'rice' }] })).toBeNull()
+  })
+})
+
+describe('steps', () => {
+  it('splits typed instructions into steps without their numbering', () => {
+    expect(stepLines('1. Brown the beef.\n\n2) Simmer.\nServe')).toEqual([
+      'Brown the beef.',
+      'Simmer.',
+      'Serve',
+    ])
+  })
+
+  it('reads the step list of a stored document', () => {
+    const recipeInstructions = [{ '@type': 'HowToStep', text: 'Brown the beef.' }, 'Simmer.']
+    expect(stepsOf({ recipeInstructions })).toEqual(['Brown the beef.', 'Simmer.'])
+  })
+
+  it('is null when the document has no step list', () => {
+    expect(stepsOf({ recipeInstructions: 'Brown the beef.' })).toBeNull()
+    expect(stepsOf({ recipeInstructions: [] })).toBeNull()
+    expect(stepsOf(null)).toBeNull()
   })
 })

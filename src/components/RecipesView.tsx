@@ -16,7 +16,13 @@ import {
 } from '../lib/ingredients'
 import { classifyLink, extractUrl } from '../lib/links'
 import { IngredientLine, Quantity } from './Quantity'
-import { buildSchemaOrgRecipe, ingredientLinesOf, type SchemaOrgRecipe } from '../lib/schemaOrg'
+import {
+  buildSchemaOrgRecipe,
+  ingredientLinesOf,
+  stepLines,
+  stepsOf,
+  type SchemaOrgRecipe,
+} from '../lib/schemaOrg'
 
 type Props = {
   projectId: string
@@ -286,6 +292,7 @@ type CardProps = {
  */
 function RecipeCard({ recipe, onEdit, onDelete }: CardProps) {
   const [full, setFull] = useState(false)
+  const steps = stepsOf(recipe.schema_org) ?? stepLines(recipe.instructions)
   const mains = recipe.recipe_ingredients.filter(isMainIngredient)
   // A recipe of only seasonings still gets a summary: its first few ingredients.
   const summary = (mains.length > 0 ? mains : recipe.recipe_ingredients.slice(0, 5)).map(
@@ -310,7 +317,13 @@ function RecipeCard({ recipe, onEdit, onDelete }: CardProps) {
                 </li>
               ))}
             </ul>
-            {recipe.instructions && <p className="instructions">{recipe.instructions}</p>}
+            {steps.length > 0 && (
+              <ol className="steps">
+                {steps.map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ol>
+            )}
             {recipe.source_url && (
               <p className="muted">
                 From{' '}
@@ -356,7 +369,7 @@ function ImportReview({ form, onSave, onEdit, onCancel }: ReviewProps) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const ingredients = parseIngredientLines(form.ingredientText)
-  const steps = form.instructions.split('\n').filter(Boolean)
+  const steps = stepLines(form.instructions)
   const facts = [
     `Makes ${form.servings}`,
     form.prepMinutes && `Prep ${formatMinutes(Number(form.prepMinutes))}`,
@@ -397,7 +410,11 @@ function ImportReview({ form, onSave, onEdit, onCancel }: ReviewProps) {
       {steps.length > 0 && (
         <div>
           <h4>{steps.length} steps</h4>
-          <p className="instructions">{form.instructions}</p>
+          <ol className="steps">
+            {steps.map((step, index) => (
+              <li key={index}>{step}</li>
+            ))}
+          </ol>
         </div>
       )}
       {error && <p className="notice">{error}</p>}
