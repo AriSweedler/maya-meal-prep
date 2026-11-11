@@ -186,6 +186,11 @@ button.row-button {
   font-size: 0.85rem;
 }
 
+.invite code {
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
 .tabs {
   display: flex;
   gap: 0.25rem;

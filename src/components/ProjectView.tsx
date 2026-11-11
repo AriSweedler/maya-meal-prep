@@ -17,6 +17,7 @@ import {
   type Project,
   type Recipe,
 } from '../lib/api'
+import { copyText } from '../lib/clipboard'
 import { addDays, startOfWeek, toISODate } from '../lib/dates'
 import { GroceryView } from './GroceryView'
 import { PlanView } from './PlanView'
@@ -37,7 +38,7 @@ export function ProjectView({ project, onLeave }: Props) {
   const [entries, setEntries] = useState<PlanEntry[]>([])
   const [members, setMembers] = useState<Member[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [codeCopied, setCodeCopied] = useState(false)
+  const [codeNote, setCodeNote] = useState<string | null>(null)
 
   const weekEnd = addDays(weekStart, 6)
   const fromDate = toISODate(weekStart)
@@ -77,9 +78,9 @@ export function ProjectView({ project, onLeave }: Props) {
   }
 
   async function copyCode() {
-    await navigator.clipboard.writeText(project.invite_code)
-    setCodeCopied(true)
-    setTimeout(() => setCodeCopied(false), 2000)
+    const copied = await copyText(project.invite_code)
+    setCodeNote(copied ? 'Copied' : 'Select the code to copy it')
+    setTimeout(() => setCodeNote(null), 2500)
   }
 
   return (
@@ -89,9 +90,11 @@ export function ProjectView({ project, onLeave }: Props) {
           <h1>{project.name}</h1>
           <p className="muted">
             {members.map((member) => member.email).join(', ')}
-            {' · '}
+          </p>
+          <p className="muted invite">
+            Invite code: <code>{project.invite_code}</code>{' '}
             <button type="button" className="link" onClick={copyCode}>
-              {codeCopied ? 'Invite code copied' : 'Copy invite code'}
+              {codeNote ?? 'Copy'}
             </button>
           </p>
         </div>

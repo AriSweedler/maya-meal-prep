@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PlanEntry, Recipe } from '../lib/api'
+import { copyText } from '../lib/clipboard'
 import { buildGroceryList, type GroceryItem, type PlannedMeal } from '../lib/grocery'
 import { formatQuantity } from '../lib/ingredients'
 
@@ -51,8 +52,7 @@ export function GroceryView({ listKey, entries, recipes }: Props) {
 
   async function copy() {
     const text = items.map((item) => [amount(item), item.name].filter(Boolean).join(' ')).join('\n')
-    await navigator.clipboard.writeText(text)
-    setCopied(true)
+    setCopied(await copyText(text))
     setTimeout(() => setCopied(false), 2000)
   }
 
