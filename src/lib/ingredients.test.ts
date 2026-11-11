@@ -54,6 +54,18 @@ describe('parseIngredientLine', () => {
     })
   })
 
+  it('reads lines as recipe sites word them', () => {
+    expect(parseIngredientLine('1 ⅓ cups heavy cream')).toEqual({
+      quantity: 1 + 1 / 3, unit: 'cup', name: 'heavy cream',
+    })
+    expect(parseIngredientLine('1 (28-ounce) can whole tomatoes')).toEqual({
+      quantity: 1, unit: 'can', name: 'whole tomatoes (28-ounce)',
+    })
+    expect(parseIngredientLine('2 medium shallots, finely chopped')).toEqual({
+      quantity: 2, unit: null, name: 'medium shallots, finely chopped',
+    })
+  })
+
   it('reads a count with no unit', () => {
     expect(parseIngredientLine('2 large eggs')).toEqual({
       quantity: 2, unit: null, name: 'large eggs',

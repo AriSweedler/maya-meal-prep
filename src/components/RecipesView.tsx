@@ -1,6 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import type { Collection, Recipe, RecipeDraft } from '../lib/api'
-import { formatIngredient, parseIngredientLines } from '../lib/ingredients'
+import {
+  importRecipe,
+  type Collection,
+  type ImportedRecipe,
+  type Recipe,
+  type RecipeDraft,
+} from '../lib/api'
+import { formatIngredient, formatQuantity, parseIngredientLines } from '../lib/ingredients'
 
 type Props = {
   collections: Collection[]
@@ -15,7 +21,11 @@ type FormState = {
   collectionId: string
   title: string
   servings: string
+  prepMinutes: string
+  cookMinutes: string
+  totalMinutes: string
   sourceUrl: string
+  sourceType: string
   ingredientText: string
   instructions: string
 }
@@ -26,11 +36,18 @@ function blankForm(collectionId: string): FormState {
     collectionId,
     title: '',
     servings: '4',
+    prepMinutes: '',
+    cookMinutes: '',
+    totalMinutes: '',
     sourceUrl: '',
+    sourceType: 'manual',
     ingredientText: '',
     instructions: '',
   }
 }
+
+const minutesText = (minutes: number | null) => (minutes === null ? '' : String(minutes))
+const minutesValue = (text: string) => (text.trim() === '' ? null : Number(text))
 
 function formFor(recipe: Recipe): FormState {
   return {
@@ -38,17 +55,62 @@ function formFor(recipe: Recipe): FormState {
     collectionId: recipe.collection_id,
     title: recipe.title,
     servings: String(recipe.servings),
+    prepMinutes: minutesText(recipe.prep_minutes),
+    cookMinutes: minutesText(recipe.cook_minutes),
+    totalMinutes: minutesText(recipe.total_minutes),
     sourceUrl: recipe.source_url ?? '',
+    sourceType: recipe.source_type,
     ingredientText: recipe.recipe_ingredients.map(formatIngredient).join('\n'),
     instructions: recipe.instructions,
+  }
+}
+
+function formForImport(imported: ImportedRecipe, collectionId: string): FormState {
+  return {
+    ...blankForm(collectionId),
+    title: imported.title,
+    servings: String(imported.servings ?? 4),
+    prepMinutes: minutesText(imported.prepMinutes),
+    cookMinutes: minutesText(imported.cookMinutes),
+    totalMinutes: minutesText(imported.totalMinutes),
+    sourceUrl: imported.sourceUrl,
+    sourceType: 'web',
+    ingredientText: imported.ingredients.join('\n'),
+    instructions: imported.instructions,
+  }
+}
+
+function formatMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours === 0) return `${rest} min`
+  return rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`
+}
+
+/** The timings a recipe has, and nothing for the ones it lacks. */
+function timings(recipe: Recipe): string[] {
+  return [
+    recipe.prep_minutes !== null && `prep ${formatMinutes(recipe.prep_minutes)}`,
+    recipe.cook_minutes !== null && `cook ${formatMinutes(recipe.cook_minutes)}`,
+    recipe.total_minutes !== null && `total ${formatMinutes(recipe.total_minutes)}`,
+  ].filter((part) => part !== false)
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
   }
 }
 
 export function RecipesView({ collections, recipes, onSave, onDelete, onAddCollection }: Props) {
   const [form, setForm] = useState<FormState | null>(null)
   const [filter, setFilter] = useState('all')
+  const [importing, setImporting] = useState(false)
 
   const shown = recipes.filter((recipe) => filter === 'all' || recipe.collection_id === filter)
+  const targetCollection = filter === 'all' ? (collections[0]?.id ?? '') : filter
 
   async function addCollection() {
     const name = window.prompt('Name the new collection')?.trim()
@@ -88,46 +150,123 @@ export function RecipesView({ collections, recipes, onSave, onDelete, onAddColle
         <button type="button" onClick={addCollection}>New collection</button>
         <button
           type="button"
+          disabled={collections.length === 0}
+          onClick={() => setImporting(!importing)}
+        >
+          Import from link
+        </button>
+        <button
+          type="button"
           className="primary"
           disabled={collections.length === 0}
-          onClick={() =>
-            setForm(blankForm(filter === 'all' ? (collections[0]?.id ?? '') : filter))
-          }
+          onClick={() => setForm(blankForm(targetCollection))}
         >
           New recipe
         </button>
       </div>
+      {importing && (
+        <ImportForm
+          onCancel={() => setImporting(false)}
+          onImported={(imported) => {
+            setImporting(false)
+            setForm(formForImport(imported, targetCollection))
+          }}
+        />
+      )}
       {shown.length === 0 && <p className="muted">No recipes here yet.</p>}
       <ul className="plain stack">
         {shown.map((recipe) => (
           <li key={recipe.id} className="card">
-            <div className="recipe-head">
-              <div>
+            <details className="recipe">
+              <summary>
                 <strong>{recipe.title}</strong>
                 <span className="muted">
-                  {' '}
-                  · makes {recipe.servings} portions · {recipe.recipe_ingredients.length}{' '}
-                  ingredients
+                  {[`makes ${recipe.servings}`, ...timings(recipe)].join(' · ')}
                 </span>
+              </summary>
+              <div className="recipe-body stack">
+                <ul>
+                  {recipe.recipe_ingredients.map((ingredient) => (
+                    <li key={ingredient.id}>{formatIngredient(ingredient)}</li>
+                  ))}
+                </ul>
+                {recipe.instructions && <p className="instructions">{recipe.instructions}</p>}
+                {recipe.source_url && (
+                  <p className="muted">
+                    From{' '}
+                    <a href={recipe.source_url} target="_blank" rel="noreferrer">
+                      {hostOf(recipe.source_url)}
+                    </a>
+                  </p>
+                )}
+                <div className="toolbar">
+                  <button type="button" onClick={() => setForm(formFor(recipe))}>Edit</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        window.confirm(`Delete "${recipe.title}"? It also leaves the meal plan.`)
+                      ) {
+                        void onDelete(recipe)
+                      }
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-              <div className="toolbar">
-                <button type="button" onClick={() => setForm(formFor(recipe))}>Edit</button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm(`Delete "${recipe.title}"? It also leaves the meal plan.`)) {
-                      void onDelete(recipe)
-                    }
-                  }}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
+            </details>
           </li>
         ))}
       </ul>
     </div>
+  )
+}
+
+type ImportProps = {
+  onImported: (recipe: ImportedRecipe) => void
+  onCancel: () => void
+}
+
+function ImportForm({ onImported, onCancel }: ImportProps) {
+  const [url, setUrl] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      onImported(await importRecipe(url.trim()))
+    } catch (cause) {
+      setError((cause as Error).message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="card stack" onSubmit={submit}>
+      <label>
+        Link to a recipe page
+        <input
+          type="url"
+          required
+          autoFocus
+          placeholder="https://cooking.nytimes.com/recipes/…"
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+        />
+      </label>
+      {error && <p className="notice">{error}</p>}
+      <div className="toolbar">
+        <button type="submit" className="primary" disabled={busy}>
+          {busy ? 'Reading the page…' : 'Import'}
+        </button>
+        <button type="button" onClick={onCancel}>Cancel</button>
+      </div>
+      <p className="muted small">You can check and edit everything before it is saved.</p>
+    </form>
   )
 }
 
@@ -143,6 +282,8 @@ function RecipeForm({ form, collections, onChange, onCancel, onSubmit }: FormPro
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const ingredients = parseIngredientLines(form.ingredientText)
+  const newHeading = form.sourceType === 'web' ? 'Imported recipe' : 'New recipe'
+  const heading = form.id ? 'Edit recipe' : newHeading
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -156,6 +297,10 @@ function RecipeForm({ form, collections, onChange, onCancel, onSubmit }: FormPro
         servings: Number(form.servings),
         instructions: form.instructions,
         sourceUrl: form.sourceUrl,
+        sourceType: form.sourceType,
+        prepMinutes: minutesValue(form.prepMinutes),
+        cookMinutes: minutesValue(form.cookMinutes),
+        totalMinutes: minutesValue(form.totalMinutes),
         ingredients,
       })
     } catch (cause) {
@@ -164,9 +309,23 @@ function RecipeForm({ form, collections, onChange, onCancel, onSubmit }: FormPro
     }
   }
 
+  const minutesField = (label: string, key: 'prepMinutes' | 'cookMinutes' | 'totalMinutes') => (
+    <label>
+      {label}
+      <input
+        type="number"
+        min="0"
+        step="1"
+        inputMode="numeric"
+        value={form[key]}
+        onChange={(event) => onChange({ ...form, [key]: event.target.value })}
+      />
+    </label>
+  )
+
   return (
     <form className="card stack" onSubmit={submit}>
-      <h2>{form.id ? 'Edit recipe' : 'New recipe'}</h2>
+      <h2>{heading}</h2>
       <label>
         Title
         <input
@@ -201,6 +360,12 @@ function RecipeForm({ form, collections, onChange, onCancel, onSubmit }: FormPro
           />
         </label>
       </div>
+      <fieldset className="times">
+        <legend>Time in minutes (optional)</legend>
+        {minutesField('Prep', 'prepMinutes')}
+        {minutesField('Cook', 'cookMinutes')}
+        {minutesField('Total', 'totalMinutes')}
+      </fieldset>
       <label>
         Ingredients, one per line
         <textarea
@@ -223,7 +388,7 @@ function RecipeForm({ form, collections, onChange, onCancel, onSubmit }: FormPro
           <tbody>
             {ingredients.map((ingredient, index) => (
               <tr key={index}>
-                <td>{ingredient.quantity ?? '—'}</td>
+                <td>{ingredient.quantity === null ? '—' : formatQuantity(ingredient.quantity)}</td>
                 <td>{ingredient.unit ?? '—'}</td>
                 <td>{ingredient.name}</td>
               </tr>

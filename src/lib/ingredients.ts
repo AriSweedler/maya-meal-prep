@@ -80,10 +80,13 @@ export function parseIngredientLine(line: string): IngredientInput | null {
     return { name: text, quantity: null, unit: null }
   }
 
-  const [firstWord, ...otherWords] = rest.split(/\s+/)
+  // "1 (28-ounce) can tomatoes": the size note sits between the count and the unit.
+  const sized = /^(\([^)]*\))\s+(.*)$/.exec(rest)
+  const note = sized ? ` ${sized[1]}` : ''
+  const [firstWord, ...otherWords] = (sized ? sized[2] : rest).split(/\s+/)
   const unitKey = firstWord.toLowerCase().replace(/\.$/, '')
   if (unitKey in UNIT_ALIASES && otherWords.length > 0) {
-    const name = otherWords.join(' ').replace(/^of\s+/i, '')
+    const name = otherWords.join(' ').replace(/^of\s+/i, '') + note
     return { name, quantity, unit: UNIT_ALIASES[unitKey] }
   }
   return { name: rest, quantity, unit: null }

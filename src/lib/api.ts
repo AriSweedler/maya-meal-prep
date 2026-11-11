@@ -81,6 +81,11 @@ export type RecipeDraft = {
   servings: number
   instructions: string
   sourceUrl: string
+  /** 'manual' for a typed recipe, 'web' for one imported from a link. */
+  sourceType: string
+  prepMinutes: number | null
+  cookMinutes: number | null
+  totalMinutes: number | null
   ingredients: IngredientInput[]
 }
 
@@ -94,11 +99,37 @@ export function saveRecipe(projectId: string, draft: RecipeDraft): Promise<strin
       p_title: draft.title,
       p_servings: draft.servings,
       p_instructions: draft.instructions,
-      p_source_type: 'manual',
+      p_source_type: draft.sourceType,
       p_source_url: draft.sourceUrl,
       p_ingredients: draft.ingredients,
+      p_prep_minutes: draft.prepMinutes ?? undefined,
+      p_cook_minutes: draft.cookMinutes ?? undefined,
+      p_total_minutes: draft.totalMinutes ?? undefined,
     }),
   )
+}
+
+/** What the import function reads from a recipe page. */
+export type ImportedRecipe = {
+  title: string
+  servings: number | null
+  ingredients: string[]
+  instructions: string
+  prepMinutes: number | null
+  cookMinutes: number | null
+  totalMinutes: number | null
+  sourceUrl: string
+}
+
+/** Read the recipe on a web page. Nothing is saved until the form is. */
+export async function importRecipe(url: string): Promise<ImportedRecipe> {
+  const { data, error } = await supabase.functions.invoke('import-recipe', { body: { url } })
+  if (error) {
+    // The function explains failures in its JSON body; fall back to the generic message.
+    const body = await (error.context as Response | undefined)?.json?.().catch(() => null)
+    throw new Error(body?.error ?? 'The recipe could not be imported.')
+  }
+  return (data as { recipe: ImportedRecipe }).recipe
 }
 
 export async function deleteRecipe(recipeId: string): Promise<void> {
