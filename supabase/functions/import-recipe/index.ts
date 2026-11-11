@@ -12,6 +12,12 @@ const CORS = {
 const MAX_PAGE_BYTES = 3_000_000
 const FETCH_TIMEOUT_MS = 15_000
 
+/** Answer with an error, and log it so it shows in the function's logs. */
+function fail(status: number, error: string, detail: Record<string, unknown> = {}): Response {
+  console.error(JSON.stringify({ event: 'import-recipe failed', status, error, ...detail }))
+  return reply(status, { error })
+}
+
 function reply(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -36,9 +42,9 @@ Deno.serve(async (request) => {
   if (!(await isSignedIn(request))) return reply(401, { error: 'Sign in to import recipes.' })
 
   const { url } = await request.json().catch(() => ({ url: null }))
-  if (typeof url !== 'string') return reply(400, { error: 'Send a link to import.' })
+  if (typeof url !== 'string') return fail(400, 'Send a link to import.')
   const rejection = rejectUrl(url)
-  if (rejection) return reply(400, { error: rejection })
+  if (rejection) return fail(400, rejection, { url })
 
   let page: Response
   try {
@@ -49,18 +55,19 @@ Deno.serve(async (request) => {
         Accept: 'text/html',
       },
     })
-  } catch {
-    return reply(502, { error: 'That page could not be reached.' })
+  } catch (cause) {
+    return fail(502, 'That page could not be reached.', { url, cause: String(cause) })
   }
   if (!page.ok) {
-    return reply(502, { error: `That page answered with an error (${page.status}).` })
+    return fail(502, `That page answered with an error (${page.status}).`, { url })
   }
 
   const html = (await page.text()).slice(0, MAX_PAGE_BYTES)
   const recipe = recipeFromHtml(html)
   if (!recipe) {
-    return reply(422, {
-      error: 'No recipe was found on that page. You can still type it in by hand.',
+    return fail(422, 'No recipe was found on that page. You can still type it in by hand.', {
+      url,
+      pageBytes: html.length,
     })
   }
   return reply(200, { recipe: { ...recipe, sourceUrl: page.url || url } })

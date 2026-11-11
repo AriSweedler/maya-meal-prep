@@ -21,7 +21,8 @@ import { copyText } from '../lib/clipboard'
 import { addDays, startOfWeek, toISODate } from '../lib/dates'
 import { GroceryView } from './GroceryView'
 import { PlanView } from './PlanView'
-import { RecipesView } from './RecipesView'
+import { RecipesTab } from './RecipesTab'
+import { RecipesView, type RecipeAction } from './RecipesView'
 
 type Props = { project: Project; onLeave: () => void }
 
@@ -39,6 +40,11 @@ export function ProjectView({ project, onLeave }: Props) {
   const [members, setMembers] = useState<Member[]>([])
   const [error, setError] = useState<string | null>(null)
   const [codeNote, setCodeNote] = useState<string | null>(null)
+  // Chosen from the Recipes tab's menu; the count remounts the view for each choice.
+  const [recipeStart, setRecipeStart] = useState<{ action: RecipeAction | null; count: number }>({
+    action: null,
+    count: 0,
+  })
 
   const weekEnd = addDays(weekStart, 6)
   const fromDate = toISODate(weekStart)
@@ -102,16 +108,27 @@ export function ProjectView({ project, onLeave }: Props) {
       </header>
 
       <nav className="tabs">
-        {TABS.map((name) => (
-          <button
-            key={name}
-            type="button"
-            className={name === tab ? 'tab active' : 'tab'}
-            onClick={() => setTab(name)}
-          >
-            {name}
-          </button>
-        ))}
+        {TABS.map((name) =>
+          name === 'Recipes' ? (
+            <RecipesTab
+              key={name}
+              active={tab === 'Recipes'}
+              onOpen={(action) => {
+                setRecipeStart({ action, count: recipeStart.count + 1 })
+                setTab('Recipes')
+              }}
+            />
+          ) : (
+            <button
+              key={name}
+              type="button"
+              className={name === tab ? 'tab active' : 'tab'}
+              onClick={() => setTab(name)}
+            >
+              {name}
+            </button>
+          ),
+        )}
       </nav>
 
       {error && <p className="notice">{error}</p>}
@@ -157,6 +174,9 @@ export function ProjectView({ project, onLeave }: Props) {
 
       {tab === 'Recipes' && (
         <RecipesView
+          key={recipeStart.count}
+          startWith={recipeStart.action}
+          projectId={project.id}
           collections={collections}
           recipes={recipes}
           onSave={async (draft) => {

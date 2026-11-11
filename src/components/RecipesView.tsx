@@ -1,20 +1,28 @@
 import { useState, type FormEvent } from 'react'
 import {
+  ImportError,
   importRecipe,
+  recordImportFailure,
   type Collection,
   type ImportedRecipe,
   type Recipe,
   type RecipeDraft,
 } from '../lib/api'
 import { formatIngredient, formatQuantity, parseIngredientLines } from '../lib/ingredients'
+import { classifyLink, extractUrl } from '../lib/links'
 
 type Props = {
+  projectId: string
   collections: Collection[]
   recipes: Recipe[]
   onSave: (draft: RecipeDraft) => Promise<void>
   onDelete: (recipe: Recipe) => Promise<void>
   onAddCollection: (name: string) => Promise<void>
+  /** Open straight into typing a recipe or importing one, from the tab's menu. */
+  startWith?: RecipeAction | null
 }
+
+export type RecipeAction = 'type' | 'link'
 
 type FormState = {
   id: string | null
@@ -80,6 +88,22 @@ function formForImport(imported: ImportedRecipe, collectionId: string): FormStat
   }
 }
 
+function draftFrom(form: FormState): RecipeDraft {
+  return {
+    id: form.id,
+    collectionId: form.collectionId,
+    title: form.title,
+    servings: Number(form.servings),
+    instructions: form.instructions,
+    sourceUrl: form.sourceUrl,
+    sourceType: form.sourceType,
+    prepMinutes: minutesValue(form.prepMinutes),
+    cookMinutes: minutesValue(form.cookMinutes),
+    totalMinutes: minutesValue(form.totalMinutes),
+    ingredients: parseIngredientLines(form.ingredientText),
+  }
+}
+
 function formatMinutes(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
@@ -104,17 +128,48 @@ function hostOf(url: string): string {
   }
 }
 
-export function RecipesView({ collections, recipes, onSave, onDelete, onAddCollection }: Props) {
-  const [form, setForm] = useState<FormState | null>(null)
+export function RecipesView({
+  projectId,
+  collections,
+  recipes,
+  onSave,
+  onDelete,
+  onAddCollection,
+  startWith = null,
+}: Props) {
   const [filter, setFilter] = useState('all')
-  const [importing, setImporting] = useState(false)
+  const targetCollection = filter === 'all' ? (collections[0]?.id ?? '') : filter
+  const [form, setForm] = useState<FormState | null>(
+    startWith === 'type' && targetCollection ? blankForm(targetCollection) : null,
+  )
+  const [importing, setImporting] = useState(startWith === 'link')
+  // An imported recipe waiting for the user to confirm it.
+  const [review, setReview] = useState<FormState | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
 
   const shown = recipes.filter((recipe) => filter === 'all' || recipe.collection_id === filter)
-  const targetCollection = filter === 'all' ? (collections[0]?.id ?? '') : filter
 
   async function addCollection() {
     const name = window.prompt('Name the new collection')?.trim()
     if (name) await onAddCollection(name)
+  }
+
+  if (review) {
+    return (
+      <ImportReview
+        form={review}
+        onEdit={() => {
+          setForm(review)
+          setReview(null)
+        }}
+        onCancel={() => setReview(null)}
+        onSave={async () => {
+          await onSave(draftFrom(review))
+          setSaved(review.title)
+          setReview(null)
+        }}
+      />
+    )
   }
 
   if (form) {
@@ -153,7 +208,7 @@ export function RecipesView({ collections, recipes, onSave, onDelete, onAddColle
           disabled={collections.length === 0}
           onClick={() => setImporting(!importing)}
         >
-          Import from link
+          From a link
         </button>
         <button
           type="button"
@@ -161,17 +216,24 @@ export function RecipesView({ collections, recipes, onSave, onDelete, onAddColle
           disabled={collections.length === 0}
           onClick={() => setForm(blankForm(targetCollection))}
         >
-          New recipe
+          Type a recipe
         </button>
       </div>
       {importing && (
         <ImportForm
+          projectId={projectId}
           onCancel={() => setImporting(false)}
           onImported={(imported) => {
             setImporting(false)
-            setForm(formForImport(imported, targetCollection))
+            setSaved(null)
+            setReview(formForImport(imported, targetCollection))
           }}
         />
+      )}
+      {saved && (
+        <p className="success" role="status">
+          “{saved}” was added to your recipes.
+        </p>
       )}
       {shown.length === 0 && <p className="muted">No recipes here yet.</p>}
       <ul className="plain stack">
@@ -223,22 +285,31 @@ export function RecipesView({ collections, recipes, onSave, onDelete, onAddColle
   )
 }
 
-type ImportProps = {
-  onImported: (recipe: ImportedRecipe) => void
+type ReviewProps = {
+  form: FormState
+  onSave: () => Promise<void>
+  onEdit: () => void
   onCancel: () => void
 }
 
-function ImportForm({ onImported, onCancel }: ImportProps) {
-  const [url, setUrl] = useState('')
+/** Shown after a successful import: what was found, before anything is saved. */
+function ImportReview({ form, onSave, onEdit, onCancel }: ReviewProps) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const ingredients = parseIngredientLines(form.ingredientText)
+  const steps = form.instructions.split('\n').filter(Boolean)
+  const facts = [
+    `Makes ${form.servings}`,
+    form.prepMinutes && `Prep ${formatMinutes(Number(form.prepMinutes))}`,
+    form.cookMinutes && `Cook ${formatMinutes(Number(form.cookMinutes))}`,
+    form.totalMinutes && `Total ${formatMinutes(Number(form.totalMinutes))}`,
+  ].filter(Boolean)
 
-  async function submit(event: FormEvent) {
-    event.preventDefault()
+  async function save() {
     setBusy(true)
     setError(null)
     try {
-      onImported(await importRecipe(url.trim()))
+      await onSave()
     } catch (cause) {
       setError((cause as Error).message)
       setBusy(false)
@@ -246,21 +317,125 @@ function ImportForm({ onImported, onCancel }: ImportProps) {
   }
 
   return (
-    <form className="card stack" onSubmit={submit}>
-      <label>
-        Link to a recipe page
-        <input
-          type="url"
-          required
-          autoFocus
-          placeholder="https://cooking.nytimes.com/recipes/…"
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-        />
-      </label>
+    <section className="card stack review">
+      <p className="success">Found it on {hostOf(form.sourceUrl)}</p>
+      <h2>{form.title}</h2>
+      <ul className="plain facts">
+        {facts.map((fact) => (
+          <li key={fact as string}>{fact}</li>
+        ))}
+      </ul>
+      <div>
+        <h4>{ingredients.length} ingredients</h4>
+        <ul>
+          {ingredients.map((ingredient, index) => (
+            <li key={index}>{formatIngredient(ingredient)}</li>
+          ))}
+        </ul>
+      </div>
+      {steps.length > 0 && (
+        <div>
+          <h4>{steps.length} steps</h4>
+          <p className="instructions">{form.instructions}</p>
+        </div>
+      )}
       {error && <p className="notice">{error}</p>}
       <div className="toolbar">
-        <button type="submit" className="primary" disabled={busy}>
+        <button type="button" className="primary" disabled={busy} onClick={save}>
+          Save recipe
+        </button>
+        <button type="button" onClick={onEdit}>Edit first</button>
+        <button type="button" onClick={onCancel}>Discard</button>
+      </div>
+    </section>
+  )
+}
+
+type ImportProps = {
+  projectId: string
+  onImported: (recipe: ImportedRecipe) => void
+  onCancel: () => void
+}
+
+function ImportForm({ projectId, onImported, onCancel }: ImportProps) {
+  const [text, setText] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const link = extractUrl(text)
+  const linkClass = link ? classifyLink(link) : null
+  // Text with no link in it can never import; say so as soon as it is typed.
+  const invalid = text.trim() !== '' && !link
+  const unsupported = linkClass !== null && !linkClass.supported
+
+  async function run(input: string) {
+    const url = extractUrl(input)
+    if (url && classifyLink(url)?.supported === false) return
+    if (!url) return
+    setBusy(true)
+    setError(null)
+    try {
+      onImported(await importRecipe(url))
+    } catch (cause) {
+      const message = (cause as Error).message
+      const status = cause instanceof ImportError ? cause.status : null
+      setError(message)
+      setBusy(false)
+      void recordImportFailure({ projectId, input, url, error: message, status })
+    }
+  }
+
+  return (
+    <form
+      className="card stack"
+      onSubmit={(event: FormEvent) => {
+        event.preventDefault()
+        void run(text)
+      }}
+    >
+      <label>
+        Paste a recipe link, or shared text with a link in it
+        <input
+          required
+          autoFocus
+          placeholder="Lentil Tomato Soup Recipe (https://cooking.nytimes.com/recipes/…)"
+          className={invalid ? 'invalid' : undefined}
+          aria-invalid={invalid}
+          value={text}
+          onChange={(event) => {
+            setText(event.target.value)
+            setError(null)
+          }}
+          onPaste={(event) => {
+            // A paste that holds a link starts the import without another tap.
+            // A paste without one is a failed attempt worth keeping for debugging.
+            const pasted = event.clipboardData.getData('text')
+            if (extractUrl(pasted)) {
+              event.preventDefault()
+              setText(pasted)
+              void run(pasted)
+            } else if (pasted.trim() !== '') {
+              void recordImportFailure({
+                projectId,
+                input: pasted,
+                url: null,
+                error: 'There is no link in that text.',
+                status: null,
+              })
+            }
+          }}
+        />
+      </label>
+      {invalid && !error && <p className="error">That is not a link.</p>}
+      {linkClass && (
+        <p className={unsupported ? 'link-class unsupported' : 'link-class'}>
+          <span className="badge">{linkClass.label}</span>
+          {unsupported && ' Importing these is not ready yet.'}
+        </p>
+      )}
+      {error && <p className="error">{error}</p>}
+      <div className="toolbar">
+        <button type="submit" className="primary" disabled={busy || invalid || unsupported}>
           {busy ? 'Reading the page…' : 'Import'}
         </button>
         <button type="button" onClick={onCancel}>Cancel</button>
@@ -290,19 +465,7 @@ function RecipeForm({ form, collections, onChange, onCancel, onSubmit }: FormPro
     setBusy(true)
     setError(null)
     try {
-      await onSubmit({
-        id: form.id,
-        collectionId: form.collectionId,
-        title: form.title,
-        servings: Number(form.servings),
-        instructions: form.instructions,
-        sourceUrl: form.sourceUrl,
-        sourceType: form.sourceType,
-        prepMinutes: minutesValue(form.prepMinutes),
-        cookMinutes: minutesValue(form.cookMinutes),
-        totalMinutes: minutesValue(form.totalMinutes),
-        ingredients,
-      })
+      await onSubmit(draftFrom(form))
     } catch (cause) {
       setError((cause as Error).message)
       setBusy(false)

@@ -43,6 +43,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"import_failures": {
+                  Row: {
+                    "created_at": string,"error": string,"http_status": number | null,"id": string,"input": string,"project_id": string | null,"url": string | null,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"error": string,"http_status"?: number | null,"id"?: string,"input": string,"project_id"?: string | null,"url"?: string | null,"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"error"?: string,"http_status"?: number | null,"id"?: string,"input"?: string,"project_id"?: string | null,"url"?: string | null,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "import_failures_project_id_fkey"
+      columns: ["project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"meal_plan_entries": {
                   Row: {
                     "created_at": string,"created_by": string | null,"id": string,"plan_date": string,"project_id": string,"recipe_id": string,"servings": number,"slot": string

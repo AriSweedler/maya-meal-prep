@@ -10,6 +10,7 @@
   --accent: light-dark(#2f6f4f, #7fc8a0);
   --accent-text: light-dark(#ffffff, #10221a);
   --notice: light-dark(#8a4b00, #f0b46a);
+  --danger: light-dark(#b3261e, #ff8a80);
 }
 
 * {
@@ -228,6 +229,45 @@ button.row-button {
   color: var(--muted);
 }
 
+.tab-menu-anchor {
+  position: relative;
+  display: flex;
+}
+
+.tab-menu-anchor .tab {
+  /* Press-and-hold opens the menu, so it must not select text or open the system menu. */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+.tab-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 0.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
+}
+
+.tab-menu button {
+  border: none;
+  background: none;
+  text-align: left;
+}
+
+.tab-menu button:hover,
+.tab-menu button:focus-visible {
+  background: var(--bg);
+}
+
 .tab.active {
   color: var(--text);
   border-bottom-color: var(--accent);
@@ -408,6 +448,60 @@ button.row-button {
   white-space: pre-line;
 }
 
+.error {
+  margin: 0;
+  color: var(--danger);
+}
+
+input.invalid {
+  border-color: var(--danger);
+  outline-color: var(--danger);
+}
+
+.link-class {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.link-class.unsupported .badge {
+  background: var(--border);
+  color: var(--text);
+}
+
+.success {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.review ul:not(.facts) {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.facts li {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
 .small {
   font-size: 0.8rem;
   margin: 0;
@@ -542,7 +636,8 @@ a {
     background: var(--bg);
   }
 
-  .tab {
+  .tab,
+  .tab-menu-anchor {
     flex: 1;
   }
 

@@ -121,15 +121,51 @@ export type ImportedRecipe = {
   sourceUrl: string
 }
 
-/** Read the recipe on a web page. Nothing is saved until the form is. */
+/** An import that failed, with the function's HTTP status when it answered. */
+export class ImportError extends Error {
+  status: number | null
+
+  constructor(message: string, status: number | null) {
+    super(message)
+    this.status = status
+  }
+}
+
+/** Read the recipe on a web page. Nothing is saved until the user confirms. */
 export async function importRecipe(url: string): Promise<ImportedRecipe> {
   const { data, error } = await supabase.functions.invoke('import-recipe', { body: { url } })
   if (error) {
     // The function explains failures in its JSON body; fall back to the generic message.
-    const body = await (error.context as Response | undefined)?.json?.().catch(() => null)
-    throw new Error(body?.error ?? 'The recipe could not be imported.')
+    const response = error.context as Response | undefined
+    const body = await response?.json?.().catch(() => null)
+    throw new ImportError(
+      body?.error ?? 'The recipe could not be imported.',
+      response?.status ?? null,
+    )
   }
   return (data as { recipe: ImportedRecipe }).recipe
+}
+
+/**
+ * Keep what the user pasted and why it failed, so the importer can be
+ * debugged later. Best effort: a failure to record is only logged.
+ */
+export async function recordImportFailure(failure: {
+  projectId: string
+  input: string
+  url: string | null
+  error: string
+  status: number | null
+}): Promise<void> {
+  console.error('Recipe import failed', failure)
+  const { error } = await supabase.from('import_failures').insert({
+    project_id: failure.projectId,
+    input: failure.input.slice(0, 4000),
+    url: failure.url?.slice(0, 2000) ?? null,
+    error: failure.error.slice(0, 2000),
+    http_status: failure.status,
+  })
+  if (error) console.error('Could not record the failed import', error.message)
 }
 
 export async function deleteRecipe(recipeId: string): Promise<void> {
